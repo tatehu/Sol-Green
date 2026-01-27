@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  # PostgreSQL 数据库
+  postgres:
+    image: postgres:15-alpine
+    container_name: sol-green-postgres
+    environment:
+      POSTGRES_USER: solgreen
+      POSTGRES_PASSWORD: solgreen123
+      POSTGRES_DB: solgreen
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U solgreen"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis 缓存
+  redis:
+    image: redis:7-alpine
+    container_name: sol-green-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Go 后端服务
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: sol-green-backend
+    ports:
+      - "8080:8080"
+    environment:
+      DB_TYPE: postgres
+      DATABASE_URL: postgres://solgreen:solgreen123@postgres:5432/solgreen?sslmode=disable
+      REDIS_URL: redis:6379
+      REDIS_PASSWORD: ""
+      JWT_SECRET: ${JWT_SECRET:-sol-green-secret-key}
+      SOLANA_RPC_URL: ${SOLANA_RPC_URL:-https://api.devnet.solana.com}
+      SOLANA_ADMIN_PRIVKEY: ${SOLANA_ADMIN_PRIVKEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
