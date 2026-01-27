@@ -1,44 +1,81 @@
-# Solana-bootcamp-2026-s1-finalProject
+# 🌱 Sol-Green - 环保奖励平台
 
-项目名称 : finalProject
+## 📌 项目简介
 
-示例：Solana 任务悬赏平台
+Sol-Green 是一个基于 Solana 区块链的去中心化环保行为记录与奖励平台。用户通过提交环保行为（垃圾分类、植树造林、低碳出行等）获得代币奖励，平台利用 AI 反欺诈检测、链上存证和第三方机构认证等技术确保行为真实性和可信度。
 
-💻 项目 Repo
-https://github.com/your-username/your-project
+## 🎬 项目演示
 
-📌 项目简介
-用 1-2 段话简要描述你的项目是什么，解决了什么问题。
+**📖 详细项目介绍（含功能截图，按使用流程组织）：**
+- [中文版项目介绍](./PROJECT_INTRO_CN.md) - 包含18张功能展示图片，从主页面到具体操作详情
+- [English Project Introduction](./PROJECT_INTRO_EN.md) - Complete feature demonstrations with 18 images
 
-示例：
+**📸 快速预览所有图片：**
+- [图片预览页面](./README_IMAGES.md) - 验证图片路径是否正确
 
-这是一个基于 Solana 的去中心化任务悬赏平台。用户可以发布任务并质押代币作为赏金，完成者提交作品后，发布者确认即可自动释放赏金。利用区块链的透明性解决传统平台的信任问题。
+**📚 其他文档：**
+- [功能演示文档](./docs/FEATURE_DEMONSTRATION.md) - 功能说明文档
+- [文档结构说明](./docs/DOCUMENT_STRUCTURE.md) - 文档逻辑结构说明
 
-🛠️ 技术栈
-列出主要使用的技术。
+## 🛠️ 技术栈
 
-示例：
+- **智能合约**：Rust + Anchor Framework
+- **后端**：Go 1.21+ + Gin Framework
+- **前端**：React 18 + Solana Wallet Adapter
+- **区块链**：Solana
+- **AI检测**：百度AI、阿里云、AWS、Google Cloud
+- **数据库**：PostgreSQL / SQLite
+- **缓存**：Redis
 
-智能合约：Rust + Anchor Framework
-前端：Next.js + TypeScript + Wallet Adapter
-工具：Solana CLI, @solana/web3.js
-🎬 Demo 演示
-演示链接
-🎥 视频演示：https://youtube.com/xxx 或 https://bilibili.com/xxx
-🌐 在线 Demo(如有)：https://your-project.vercel.app
-功能截图
-首页 功能演示
+## 💡 核心功能
 
-💡 核心功能
-简单列出 3-5 个核心功能。
+- 🌱 **环保行为记录**：垃圾分类、植树造林、低碳出行等行为上链记录
+- 🎯 **挑战活动**：创建和参与环保挑战活动，获得额外奖励
+- 🎁 **营销活动**：签到、邀请、每日任务、幸运抽奖等各类营销活动
+- 🤖 **AI反欺诈检测**：集成全球领先AI检测技术，确保行为真实性
+- 🌍 **第三方认证**：支持UNEP、WWF、Greenpeace等全球组织认证
+- 💰 **代币奖励**：基于Solana区块链的即时奖励发放
+- 🔒 **链上存证**：所有行为永久记录在Solana链上
 
-示例：
+## 🚀 快速开始
 
-创建任务并质押赏金
-提交作品
-确认完成自动释放赏金
-取消任务退回代币
-✍️ 项目创作者：
-创作者昵称 xxx
-创作者联系方式 xxx
-创作者 Solana USDC 钱包地址 xxx
+```bash
+# 1. 克隆项目
+git clone <repository-url>
+cd Solana-bootcamp-2026-s1-finalProject
+
+# 2. 启动服务（使用Docker Compose）
+docker-compose up -d
+
+# 3. 启动前端
+cd frontend
+npm install
+npm start
+```
+
+详细配置说明请参考：[快速开始指南](./docs/QUICKSTART_v3.0.0_CN.md)
+
+## 📚 文档
+
+- [项目介绍（中文）](./PROJECT_INTRO_CN.md) / [Project Introduction (English)](./PROJECT_INTRO_EN.md)
+- [快速开始指南](./docs/QUICKSTART_v3.0.0_CN.md)
+- [API 文档](./docs/API_v3.0.0_CN.md)
+- [部署文档](./docs/DEPLOYMENT_v3.0.0_CN.md)
+- [技术文档](./docs/TECHNICAL_v3.0.0_CN.md)
+
+## 📸 功能截图
+
+查看完整的功能演示图片和说明：[功能演示文档](./docs/FEATURE_DEMONSTRATION.md)
+
+## 🤝 贡献
+
+欢迎提交 Issue 和 Pull Request！
+
+## 📄 许可证
+
+MIT License
+
+---
+
+**版本**: v3.0.0  
+**最后更新**: 2026-01-27
