@@ -1,0 +1,72 @@
+.marketing {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.marketing h2 {
+  margin-bottom: 30px;
+  color: #2c3e50;
+}
+
+.activities-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.activity-card {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.activity-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  margin-bottom: 15px;
+}
+
+.activity-header h3 {
+  margin: 0;
+  flex: 1;
+  color: #2c3e50;
+}
+
+.activity-type {
+  padding: 4px 12px;
+  background-color: #4CAF50;
+  color: white;
+  border-radius: 12px;
+  font-size: 12px;
+}
+
+.activity-description {
+  color: #666;
+  margin-bottom: 15px;
+  line-height: 1.6;
+}
+
+.activity-info {
+  margin-bottom: 15px;
+}
+
+.info-item {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.info-item .reward {
+  color: #4CAF50;
+  font-weight: bold;
+}
+
+.loading, .empty-state {
+  text-align: center;
+  padding: 40px;
+  color: #666;
+}

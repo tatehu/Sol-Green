@@ -1,0 +1,231 @@
+# 快速开始指南
+
+## 5 分钟快速体验
+
+### 1. 环境准备
+
+确保已安装：
+- Go 1.21+ (或使用 Docker)
+- Node.js 18+
+- Docker & Docker Compose (推荐)
+
+### 2. 克隆项目
+
+```bash
+git clone <repository-url>
+cd trends_solana
+```
+
+### 3. 配置环境变量
+
+```bash
+cp .env.example .env
+# 编辑 .env 文件（可选，开发环境可使用默认值）
+```
+
+### 4. 启动服务（最简单方式）
+
+```bash
+# 使用 Docker Compose 一键启动
+docker-compose up -d
+
+# 查看服务状态
+docker-compose ps
+
+# 查看日志
+docker-compose logs -f backend
+```
+
+### 5. 访问应用
+
+- **后端 API**: http://localhost:8080
+- **健康检查**: http://localhost:8080/api/v1/health
+- **前端应用**: 需要单独启动（见下方）
+
+### 6. 启动前端
+
+```bash
+cd frontend
+npm install
+npm start
+```
+
+前端将在 http://localhost:3000 启动
+
+### 7. 测试 API
+
+```bash
+# 健康检查
+curl http://localhost:8080/api/v1/health
+
+# 钱包登录（示例）
+curl -X POST http://localhost:8080/api/v1/auth/wallet \
+  -H "Content-Type: application/json" \
+  -d '{
+    "wallet_addr": "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU",
+    "signature": "test_signature",
+    "message": "test_message"
+  }'
+```
+
+## 本地开发模式
+
+### 后端开发
+
+```bash
+# 进入后端目录
+cd backend
+
+# 安装依赖
+go mod download
+
+# 启动 PostgreSQL 和 Redis（使用 Docker）
+cd ..
+docker-compose up -d postgres redis
+
+# 配置环境变量（使用 SQLite 可跳过数据库）
+export DB_TYPE=sqlite
+
+# 运行后端
+cd backend
+go run main.go
+```
+
+后端将在 `http://localhost:8080` 启动
+
+### 前端开发
+
+```bash
+cd frontend
+npm install
+npm start
+```
+
+前端将在 `http://localhost:3000` 启动
+
+### 智能合约开发
+
+```bash
+# 安装 Anchor CLI
+cargo install --git https://github.com/coral-xyz/anchor avm --locked --force
+avm install latest
+avm use latest
+
+# 进入合约目录
+cd contracts/sol-green
+
+# 构建合约
+anchor build
+
+# 运行测试
+anchor test
+```
+
+## 验证项目
+
+运行验证脚本检查项目完整性：
+
+```bash
+./scripts/verify.sh
+```
+
+## 常见问题
+
+### Q: 后端启动失败？
+
+**A:** 检查：
+1. 端口 8080 是否被占用
+2. 数据库/Redis 是否正常启动
+3. 环境变量配置是否正确
+
+解决方案：
+```bash
+# 检查端口占用
+lsof -i :8080
+
+# 检查 Docker 服务
+docker-compose ps
+
+# 查看后端日志
+docker-compose logs backend
+```
+
+### Q: 前端无法连接后端？
+
+**A:** 
+1. 检查后端是否运行在 http://localhost:8080
+2. 检查 CORS 配置
+3. 查看浏览器控制台错误信息
+
+解决方案：
+```bash
+# 检查后端健康状态
+curl http://localhost:8080/api/v1/health
+
+# 检查前端 API 配置
+cat frontend/src/pages/GreenSubmit.jsx | grep API_BASE_URL
+```
+
+### Q: Solana 交易失败？
+
+**A:**
+1. 检查钱包是否有足够的 SOL
+2. 确认网络配置（devnet/mainnet）
+3. 验证 RPC 节点是否可用
+
+解决方案：
+```bash
+# 检查 Solana 配置
+solana config get
+
+# 获取测试币（测试网）
+solana airdrop 1 <your-wallet-address> --url devnet
+```
+
+### Q: 数据库迁移失败？
+
+**A:**
+1. 检查数据库连接字符串
+2. 确认数据库用户权限
+3. 查看应用日志
+
+解决方案：
+```bash
+# 检查数据库连接
+docker-compose exec postgres psql -U solgreen -d solgreen -c "SELECT 1;"
+
+# 查看后端日志
+docker-compose logs backend | grep -i error
+```
+
+### Q: Docker 构建失败？
+
+**A:**
+1. 检查 Docker 是否正常运行
+2. 检查网络连接（下载依赖）
+3. 查看构建日志
+
+解决方案：
+```bash
+# 检查 Docker
+docker --version
+docker-compose --version
+
+# 清理并重新构建
+docker-compose down
+docker-compose build --no-cache
+```
+
+## 下一步
+
+- 阅读 [README.md](../README.md) 了解项目详情
+- 查看 [开发文档](./DEVELOPMENT.md) 开始开发
+- 参考 [API 文档](./API.md) 了解接口
+- 查看 [部署文档](./DEPLOYMENT.md) 进行生产部署
+- 查看 [项目结构](./PROJECT_STRUCTURE.md) 了解代码组织
+
+## 获取帮助
+
+- 提交 Issue
+- 查看文档
+- 联系项目维护者

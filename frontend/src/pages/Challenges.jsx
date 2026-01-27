@@ -1,0 +1,325 @@
+import { useState, useEffect } from 'react';
+import { useWalletContext } from '../components/WalletConnect';
+import axios from 'axios';
+import './Challenges.css';
+
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080';
+
+export const Challenges = () => {
+  const { publicKey } = useWalletContext();
+  const [challenges, setChallenges] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [selectedChallenge, setSelectedChallenge] = useState(null);
+
+  useEffect(() => {
+    loadChallenges();
+  }, []);
+
+  const loadChallenges = async () => {
+    setLoading(true);
+    try {
+      const res = await axios.get(`${API_BASE_URL}/api/v1/challenges`);
+      setChallenges(res.data.data || []);
+    } catch (err) {
+      console.error('加载挑战失败:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getStatusText = (status) => {
+    const statusMap = {
+      'draft': '📝 草稿',
+      'active': '🔥 进行中',
+      'completed': '✅ 已完成',
+      'cancelled': '❌ 已取消',
+    };
+    return statusMap[status] || status;
+  };
+
+  const getBehaviorTypeText = (type) => {
+    const typeMap = {
+      'waste_sorting': '🗑️ 垃圾分类',
+      'tree_planting': '🌳 植树造林',
+      'low_carbon_travel': '🚴 低碳出行',
+    };
+    return typeMap[type] || type;
+  };
+
+  const formatDate = (dateStr) => {
+    return new Date(dateStr).toLocaleString('zh-CN');
+  };
+
+  const calculateProgress = (current, target) => {
+    return Math.min((current / target) * 100, 100);
+  };
+
+  return (
+    <div className="challenges">
+      <div className="challenges-header">
+        <h2>🌱 环保挑战活动</h2>
+        {publicKey && (
+          <button 
+            className="btn btn-primary"
+            onClick={() => setShowCreateModal(true)}
+          >
+            + 发起挑战
+          </button>
+        )}
+      </div>
+
+      {loading ? (
+        <div className="loading">加载中...</div>
+      ) : challenges.length === 0 ? (
+        <div className="empty-state">
+          <p>暂无进行中的挑战活动</p>
+        </div>
+      ) : (
+        <div className="challenges-grid">
+          {challenges.map((challenge) => (
+            <div key={challenge.id} className="challenge-card">
+              <div className="challenge-header">
+                <h3>{challenge.title}</h3>
+                <span className={`status-badge status-${challenge.status}`}>
+                  {getStatusText(challenge.status)}
+                </span>
+              </div>
+              
+              <p className="challenge-description">{challenge.description}</p>
+              
+              <div className="challenge-info">
+                <div className="info-item">
+                  <span className="label">类型:</span>
+                  <span>{getBehaviorTypeText(challenge.behavior_type)}</span>
+                </div>
+                <div className="info-item">
+                  <span className="label">奖励:</span>
+                  <span className="reward">{challenge.reward_amount} SOLGREEN</span>
+                </div>
+                <div className="info-item">
+                  <span className="label">时间:</span>
+                  <span>{formatDate(challenge.start_time)} - {formatDate(challenge.end_time)}</span>
+                </div>
+              </div>
+
+              <div className="challenge-progress">
+                <div className="progress-label">
+                  <span>参与进度</span>
+                  <span>{challenge.current_count} / {challenge.target_count}</span>
+                </div>
+                <div className="progress-bar">
+                  <div 
+                    className="progress-fill"
+                    style={{ width: `${calculateProgress(challenge.current_count, challenge.target_count)}%` }}
+                  />
+                </div>
+              </div>
+
+              <div className="challenge-actions">
+                <button 
+                  className="btn btn-secondary"
+                  onClick={() => setSelectedChallenge(challenge)}
+                >
+                  查看详情
+                </button>
+                {challenge.status === 'active' && publicKey && (
+                  <button className="btn btn-primary">
+                    参与挑战
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {showCreateModal && (
+        <CreateChallengeModal 
+          onClose={() => setShowCreateModal(false)}
+          onSuccess={() => {
+            setShowCreateModal(false);
+            loadChallenges();
+          }}
+        />
+      )}
+
+      {selectedChallenge && (
+        <ChallengeDetailModal
+          challenge={selectedChallenge}
+          onClose={() => setSelectedChallenge(null)}
+        />
+      )}
+    </div>
+  );
+};
+
+// 创建挑战模态框
+const CreateChallengeModal = ({ onClose, onSuccess }) => {
+  const { publicKey } = useWalletContext();
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    challenge_type: 'individual',
+    behavior_type: 'waste_sorting',
+    reward_amount: 1000,
+    target_count: 10,
+    start_time: '',
+    end_time: '',
+    rules: '',
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!publicKey) {
+      setError('请先连接钱包');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setError('请先登录');
+        return;
+      }
+
+      await axios.post(
+        `${API_BASE_URL}/api/v1/challenges`,
+        formData,
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+
+      onSuccess();
+    } catch (err) {
+      setError(err.response?.data?.error || '创建失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <h3>发起挑战</h3>
+        <form onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label>挑战标题 *</label>
+            <input
+              type="text"
+              value={formData.title}
+              onChange={(e) => setFormData({...formData, title: e.target.value})}
+              required
+            />
+          </div>
+          <div className="form-group">
+            <label>挑战描述 *</label>
+            <textarea
+              value={formData.description}
+              onChange={(e) => setFormData({...formData, description: e.target.value})}
+              required
+            />
+          </div>
+          <div className="form-group">
+            <label>挑战类型 *</label>
+            <select
+              value={formData.challenge_type}
+              onChange={(e) => setFormData({...formData, challenge_type: e.target.value})}
+            >
+              <option value="individual">个人挑战</option>
+              <option value="team">团队挑战</option>
+              <option value="community">社区挑战</option>
+            </select>
+          </div>
+          <div className="form-group">
+            <label>行为类型 *</label>
+            <select
+              value={formData.behavior_type}
+              onChange={(e) => setFormData({...formData, behavior_type: e.target.value})}
+            >
+              <option value="waste_sorting">垃圾分类</option>
+              <option value="tree_planting">植树造林</option>
+              <option value="low_carbon_travel">低碳出行</option>
+            </select>
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label>奖励数量 *</label>
+              <input
+                type="number"
+                value={formData.reward_amount}
+                onChange={(e) => setFormData({...formData, reward_amount: parseInt(e.target.value)})}
+                min="1"
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label>目标人数 *</label>
+              <input
+                type="number"
+                value={formData.target_count}
+                onChange={(e) => setFormData({...formData, target_count: parseInt(e.target.value)})}
+                min="1"
+                required
+              />
+            </div>
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label>开始时间 *</label>
+              <input
+                type="datetime-local"
+                value={formData.start_time}
+                onChange={(e) => setFormData({...formData, start_time: e.target.value})}
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label>结束时间 *</label>
+              <input
+                type="datetime-local"
+                value={formData.end_time}
+                onChange={(e) => setFormData({...formData, end_time: e.target.value})}
+                required
+              />
+            </div>
+          </div>
+          {error && <div className="error-message">{error}</div>}
+          <div className="modal-actions">
+            <button type="button" onClick={onClose} className="btn btn-secondary">
+              取消
+            </button>
+            <button type="submit" disabled={loading} className="btn btn-primary">
+              {loading ? '创建中...' : '创建挑战'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// 挑战详情模态框
+const ChallengeDetailModal = ({ challenge, onClose }) => {
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <h3>{challenge.title}</h3>
+        <p>{challenge.description}</p>
+        {challenge.rules && (
+          <div>
+            <h4>挑战规则</h4>
+            <p>{challenge.rules}</p>
+          </div>
+        )}
+        <button onClick={onClose} className="btn btn-primary">关闭</button>
+      </div>
+    </div>
+  );
+};

@@ -1,0 +1,368 @@
+# API 文档
+
+## 基础信息
+
+- **Base URL**: `http://localhost:8080/api/v1`
+- **认证方式**: Bearer Token (JWT)
+- **数据格式**: JSON
+
+## 通用响应格式
+
+### 成功响应
+
+```json
+{
+  "data": {},
+  "msg": "操作成功"
+}
+```
+
+### 错误响应
+
+```json
+{
+  "error": "错误信息",
+  "detail": "详细错误信息（可选）"
+}
+```
+
+## 认证接口
+
+### 钱包登录
+
+**POST** `/auth/wallet`
+
+用户使用 Solana 钱包签名进行登录认证。
+
+#### 请求参数
+
+```json
+{
+  "wallet_addr": "string",  // Solana 钱包地址
+  "signature": "string",     // 签名（hex 编码）
+  "message": "string"        // 签名消息
+}
+```
+
+#### 响应示例
+
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "wallet_addr": "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU"
+}
+```
+
+#### 状态码
+
+- `200`: 登录成功
+- `400`: 参数错误
+- `401`: 签名验证失败
+
+## 环保行为接口
+
+### 提交环保行为
+
+**POST** `/green/behavior/submit`
+
+提交环保行为申报，系统将进行 AI 反欺诈检测并自动发放奖励。
+
+#### 请求头
+
+```
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+#### 请求参数
+
+```json
+{
+  "behavior_type": "waste_sorting",  // 行为类型: waste_sorting | tree_planting | low_carbon_travel
+  "media_urls": [                    // 媒体文件 URL 数组（1-5 个）
+    "https://example.com/image1.jpg",
+    "https://example.com/image2.jpg"
+  ],
+  "location": "上海张江软件园"        // 行为地点（可选）
+}
+```
+
+#### 响应示例
+
+**自动通过（低风险）**
+```json
+{
+  "msg": "认证通过，奖励已发放",
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "status": "approved",
+  "tx_hash": "5j7s8K9...",
+  "proof": "a1b2c3d4..."
+}
+```
+
+**待审核（高风险）**
+```json
+{
+  "msg": "提交成功，进入人工审核",
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "status": "pending_review"
+}
+```
+
+#### 状态码
+
+- `200`: 提交成功
+- `400`: 参数错误
+- `401`: 未登录
+- `429`: 请求过于频繁（防重复提交）
+
+### 查询行为状态
+
+**GET** `/green/behavior/:id`
+
+查询指定行为记录的详细状态。
+
+#### 请求头
+
+```
+Authorization: Bearer <token>
+```
+
+#### 路径参数
+
+- `id`: 行为记录 ID
+
+#### 响应示例
+
+```json
+{
+  "data": {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "wallet_addr": "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU",
+    "behavior_type": "waste_sorting",
+    "media_urls": ["https://example.com/image1.jpg"],
+    "location": "上海张江软件园",
+    "status": "approved",
+    "fraud_score": 0.15,
+    "submit_time": "2024-01-15T10:30:00Z",
+    "approve_time": "2024-01-15T10:30:05Z",
+    "tx_hash": "5j7s8K9...",
+    "proof_hash": "a1b2c3d4..."
+  }
+}
+```
+
+#### 状态码
+
+- `200`: 查询成功
+- `401`: 未登录
+- `404`: 记录不存在
+
+### 领取奖励
+
+**POST** `/green/reward/claim`
+
+领取待领取的奖励（预留接口）。
+
+#### 请求头
+
+```
+Authorization: Bearer <token>
+```
+
+#### 响应示例
+
+```json
+{
+  "msg": "奖励领取成功"
+}
+```
+
+## 第三方认证接口
+
+### 第三方机构认证
+
+**POST** `/green/partner/verify`
+
+通过第三方认证机构验证环保行为。
+
+#### 请求头
+
+```
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+#### 请求参数
+
+```json
+{
+  "behavior_id": "550e8400-e29b-41d4-a716-446655440000",  // 行为记录 ID
+  "partner_id": "alashan_see",                           // 认证机构 ID: alashan_see | gov_environment
+  "verify_code": "SEE123456"                             // 认证码
+}
+```
+
+#### 响应示例
+
+**认证通过**
+```json
+{
+  "msg": "第三方认证通过，奖励已发放",
+  "tx_hash": "5j7s8K9..."
+}
+```
+
+**认证未通过**
+```json
+{
+  "msg": "第三方认证未通过"
+}
+```
+
+#### 状态码
+
+- `200`: 请求成功
+- `400`: 参数错误
+- `401`: 未登录
+- `404`: 行为记录不存在
+- `500`: 认证服务错误
+
+## 错误码说明
+
+| 状态码 | 说明 |
+|--------|------|
+| 200 | 请求成功 |
+| 400 | 请求参数错误 |
+| 401 | 未认证或认证失败 |
+| 403 | 权限不足 |
+| 404 | 资源不存在 |
+| 429 | 请求过于频繁 |
+| 500 | 服务器内部错误 |
+
+## 限流说明
+
+- **IP 限流**: 每个 IP 每分钟最多 60 个请求
+- **防重复提交**: 同一用户同一行为类型 5 分钟内只能提交一次
+
+## 示例代码
+
+### JavaScript/TypeScript
+
+```javascript
+import axios from 'axios';
+
+const API_BASE_URL = 'http://localhost:8080/api/v1';
+
+// 钱包登录
+async function walletLogin(walletAddr, signature, message) {
+  const response = await axios.post(`${API_BASE_URL}/auth/wallet`, {
+    wallet_addr: walletAddr,
+    signature,
+    message
+  });
+  return response.data.token;
+}
+
+// 提交环保行为
+async function submitBehavior(token, behaviorData) {
+  const response = await axios.post(
+    `${API_BASE_URL}/green/behavior/submit`,
+    behaviorData,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    }
+  );
+  return response.data;
+}
+
+// 查询行为状态
+async function getBehaviorStatus(token, behaviorId) {
+  const response = await axios.get(
+    `${API_BASE_URL}/green/behavior/${behaviorId}`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    }
+  );
+  return response.data.data;
+}
+```
+
+### Go
+
+```go
+package main
+
+import (
+    "bytes"
+    "encoding/json"
+    "net/http"
+)
+
+func walletLogin(walletAddr, signature, message string) (string, error) {
+    data := map[string]string{
+        "wallet_addr": walletAddr,
+        "signature":   signature,
+        "message":     message,
+    }
+    jsonData, _ := json.Marshal(data)
+    
+    resp, err := http.Post(
+        "http://localhost:8080/api/v1/auth/wallet",
+        "application/json",
+        bytes.NewBuffer(jsonData),
+    )
+    // ... 处理响应
+}
+
+func submitBehavior(token string, behaviorData map[string]interface{}) error {
+    jsonData, _ := json.Marshal(behaviorData)
+    
+    req, _ := http.NewRequest(
+        "POST",
+        "http://localhost:8080/api/v1/green/behavior/submit",
+        bytes.NewBuffer(jsonData),
+    )
+    req.Header.Set("Authorization", "Bearer "+token)
+    req.Header.Set("Content-Type", "application/json")
+    
+    client := &http.Client{}
+    resp, err := client.Do(req)
+    // ... 处理响应
+}
+```
+
+## 测试工具
+
+### 使用 curl
+
+```bash
+# 钱包登录
+curl -X POST http://localhost:8080/api/v1/auth/wallet \
+  -H "Content-Type: application/json" \
+  -d '{
+    "wallet_addr": "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU",
+    "signature": "abc123...",
+    "message": "test message"
+  }'
+
+# 提交行为（需要先获取 token）
+curl -X POST http://localhost:8080/api/v1/green/behavior/submit \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "behavior_type": "waste_sorting",
+    "media_urls": ["https://example.com/image.jpg"],
+    "location": "测试地点"
+  }'
+```
+
+### 使用 Postman
+
+1. 导入 API 集合（如提供）
+2. 设置环境变量（base_url, token）
+3. 按顺序执行请求
