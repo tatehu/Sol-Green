@@ -5,11 +5,29 @@ import './Challenges.css';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080';
 
+const getDefaultChallengeBg = (behaviorType) => {
+  switch (behaviorType) {
+    case 'waste_sorting':
+      return 'linear-gradient(135deg, rgba(34,197,94,0.20), rgba(20,184,166,0.10))';
+    case 'tree_planting':
+      return 'linear-gradient(135deg, rgba(16,185,129,0.22), rgba(34,197,94,0.10))';
+    case 'low_carbon_travel':
+      return 'linear-gradient(135deg, rgba(59,130,246,0.22), rgba(56,189,248,0.10))';
+    default:
+      return 'linear-gradient(135deg, rgba(148,163,184,0.18), rgba(226,232,240,0.10))';
+  }
+};
+
 // 根据状态和时间判断显示文本
 const getStatusText = (status, startTime, endTime) => {
   const now = Date.now();
   const start = startTime ? new Date(startTime).getTime() : 0;
   const end = endTime ? new Date(endTime).getTime() : 0;
+
+  // 挑战时间已结束，则统一展示“已结束”
+  if (end > 0 && now >= end) {
+    return '⏱ 已结束';
+  }
 
   // 如果状态是草稿，但开始时间还没到，显示"即将开始"
   if (status === 'draft' && start > 0 && now < start) {
@@ -31,6 +49,24 @@ const getStatusText = (status, startTime, endTime) => {
     cancelled: '❌ 已取消',
   };
   return statusMap[status] || status || '-';
+};
+
+// 视觉状态对应的样式（避免“进行中”文字相同但底色不同）
+const getStatusClass = (status, startTime, endTime) => {
+  const now = Date.now();
+  const start = startTime ? new Date(startTime).getTime() : 0;
+  const end = endTime ? new Date(endTime).getTime() : 0;
+
+  if (end > 0 && now >= end || status === 'completed') return 'status-completed';
+  if (status === 'cancelled') return 'status-cancelled';
+
+  // 时间在范围内，一律按“进行中”视觉处理
+  if (start > 0 && now >= start && (end === 0 || now < end)) {
+    return 'status-active';
+  }
+
+  // 其余都按“即将开始/草稿”的灰色
+  return 'status-draft';
 };
 
 const getBehaviorTypeText = (type) => {
@@ -106,66 +142,80 @@ export const Challenges = () => {
       ) : (
         <div className="challenges-grid">
           {challenges.map((challenge) => (
-            <div key={challenge.id} className="challenge-card">
-              <div className="challenge-header">
-                <h3>{challenge.title}</h3>
-                <span className={`status-badge status-${challenge.status}`}>
-                  {getStatusText(challenge.status, challenge.start_time, challenge.end_time)}
-                </span>
-              </div>
+            <div
+              key={challenge.id}
+              className="challenge-card"
+              style={{
+                background: challenge.image_url ? undefined : getDefaultChallengeBg(challenge.behavior_type),
+                backgroundImage: challenge.image_url ? `url(${challenge.image_url})` : undefined,
+                backgroundSize: challenge.image_url ? 'cover' : undefined,
+                backgroundPosition: challenge.image_url ? 'center' : undefined,
+              }}
+            >
+              <div className="challenge-card-overlay" />
+              <div className="challenge-card-content">
+                <div className="challenge-header">
+                  <h3>{challenge.title}</h3>
+                  <span
+                    className={`status-badge ${getStatusClass(challenge.status, challenge.start_time, challenge.end_time)}`}
+                  >
+                    {getStatusText(challenge.status, challenge.start_time, challenge.end_time)}
+                  </span>
+                </div>
               
-              <p className="challenge-description">{challenge.description}</p>
+                <p className="challenge-description">{challenge.description}</p>
               
-              <div className="challenge-info">
-                <div className="info-item">
-                  <span className="label">类型:</span>
-                  <span>{getBehaviorTypeText(challenge.behavior_type)}</span>
+                <div className="challenge-info">
+                  <div className="info-item">
+                    <span className="label">类型:</span>
+                    <span>{getBehaviorTypeText(challenge.behavior_type)}</span>
+                  </div>
+                  <div className="info-item">
+                    <span className="label">奖励:</span>
+                    <span className="reward">{challenge.reward_amount} SOLGREEN</span>
+                  </div>
+                  <div className="info-item">
+                    <span className="label">时间:</span>
+                    <span>{formatDate(challenge.start_time)} - {formatDate(challenge.end_time)}</span>
+                  </div>
                 </div>
-                <div className="info-item">
-                  <span className="label">奖励:</span>
-                  <span className="reward">{challenge.reward_amount} SOLGREEN</span>
-                </div>
-                <div className="info-item">
-                  <span className="label">时间:</span>
-                  <span>{formatDate(challenge.start_time)} - {formatDate(challenge.end_time)}</span>
-                </div>
-              </div>
 
-              <div className="challenge-progress">
-                <div className="progress-label">
-                  <span>参与进度</span>
-                  <span>{challenge.current_count} / {challenge.target_count}</span>
+                <div className="challenge-progress">
+                  <div className="progress-label">
+                    <span>参与进度</span>
+                    <span>{challenge.current_count} / {challenge.target_count}</span>
+                  </div>
+                  <div className="progress-bar">
+                    <div 
+                      className="progress-fill"
+                      style={{ width: `${calculateProgress(challenge.current_count, challenge.target_count)}%` }}
+                    />
+                  </div>
                 </div>
-                <div className="progress-bar">
-                  <div 
-                    className="progress-fill"
-                    style={{ width: `${calculateProgress(challenge.current_count, challenge.target_count)}%` }}
-                  />
-                </div>
-              </div>
 
-              <div className="challenge-actions">
-                <button 
-                  className="btn btn-secondary"
-                  onClick={() => setSelectedChallenge(challenge)}
-                >
-                  查看详情
-                </button>
-                {(() => {
-                  const now = Date.now();
-                  const start = challenge.start_time ? new Date(challenge.start_time).getTime() : 0;
-                  const end = challenge.end_time ? new Date(challenge.end_time).getTime() : 0;
-                  const canJoin = (challenge.status === 'active' || challenge.status === 'draft') && 
-                                  start > 0 && now >= start && now < end && publicKey;
-                  return canJoin ? (
-                    <button 
-                      className="btn btn-primary"
-                      onClick={() => setJoinChallengeId(challenge.id)}
-                    >
-                      参与挑战
-                    </button>
-                  ) : null;
-                })()}
+                <div className="challenge-actions">
+                  <button 
+                    className="btn btn-secondary"
+                    onClick={() => setSelectedChallenge(challenge)}
+                  >
+                    查看详情
+                  </button>
+                  {(() => {
+                    const now = Date.now();
+                    const start = challenge.start_time ? new Date(challenge.start_time).getTime() : 0;
+                    const end = challenge.end_time ? new Date(challenge.end_time).getTime() : 0;
+                    const canJoin = (challenge.status === 'active' || challenge.status === 'draft') && 
+                                    start > 0 && now >= start && now < end && publicKey;
+                    return canJoin ? (
+                      <button 
+                        className="btn btn-primary"
+                        onClick={() => setJoinChallengeId(challenge.id)}
+                      >
+                        参与挑战
+                      </button>
+                    ) : null;
+                  })()}
+                </div>
               </div>
             </div>
           ))}
@@ -228,9 +278,26 @@ const CreateChallengeModal = ({ onClose, onSuccess }) => {
     start_time: '',
     end_time: '',
     rules: '',
+    image_url: '',
   });
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const uploadImageIfNeeded = async (token) => {
+    if (!imageFile) return '';
+    const fd = new FormData();
+    fd.append('file', imageFile);
+    const res = await axios.post(`${API_BASE_URL}/api/v1/upload/image`, fd, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const url = res.data?.url || '';
+    if (!url) return '';
+    // 后端返回相对路径时，补全为可直接访问的绝对地址（否则前端会去 3000 端口取图）
+    if (typeof url === 'string' && url.startsWith('/')) return `${API_BASE_URL}${url}`;
+    return url;
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -269,9 +336,16 @@ const CreateChallengeModal = ({ onClose, onSuccess }) => {
         return;
       }
 
+      let uploadedUrl = '';
+      try {
+        uploadedUrl = await uploadImageIfNeeded(token);
+      } catch (e) {
+        setError(e?.response?.data?.detail || e?.response?.data?.error || e?.message || '图片上传失败');
+        return;
+      }
       const res = await axios.post(
         `${API_BASE_URL}/api/v1/challenges`,
-        formData,
+        { ...formData, image_url: uploadedUrl || formData.image_url },
         {
           headers: { Authorization: `Bearer ${token}` }
         }
@@ -371,6 +445,45 @@ const CreateChallengeModal = ({ onClose, onSuccess }) => {
               />
             </div>
           </div>
+
+          <div className="form-group">
+            <label>挑战规则（可选）</label>
+            <textarea
+              value={formData.rules}
+              onChange={(e) => setFormData({ ...formData, rules: e.target.value })}
+              placeholder="例如：完成指定次数的环保行为即可领取奖励"
+            />
+          </div>
+
+          <div className="form-group">
+            <label>背景图片（可选）</label>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => {
+                const file = e.target.files?.[0] || null;
+                setImageFile(file);
+                if (file) {
+                  setImagePreview(URL.createObjectURL(file));
+                } else {
+                  setImagePreview('');
+                }
+              }}
+            />
+            <div style={{ marginTop: 6, fontSize: 12, color: '#64748b' }}>
+              选择本地图片会自动上传；不选则使用默认背景。
+            </div>
+            {imagePreview && (
+              <div style={{ marginTop: 8 }}>
+                <img
+                  src={imagePreview}
+                  alt="预览"
+                  style={{ width: '100%', maxHeight: 180, objectFit: 'cover', borderRadius: 8 }}
+                />
+              </div>
+            )}
+          </div>
+
           {error && <div className="error-message">{error}</div>}
           <div className="modal-actions">
             <button type="button" onClick={onClose} className="btn btn-secondary">
@@ -605,13 +718,25 @@ const ChallengeDetailModal = ({ challenge, onClose, onJoin }) => {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-        <h3>{data?.title || '挑战详情'}</h3>
+      <div className="modal-content challenge-detail-modal" onClick={(e) => e.stopPropagation()}>
+        {data?.image_url ? (
+          <div className="challenge-detail-banner">
+            <img
+              src={data.image_url}
+              alt={data.title}
+              className="challenge-detail-banner-img"
+            />
+          </div>
+        ) : null}
+
+        <h3 className="challenge-detail-title">
+          {data?.title || '挑战详情'}
+        </h3>
 
         {detailLoading ? <div className="loading">加载中...</div> : null}
         {detailError ? <div className="error-message">{detailError}</div> : null}
 
-        <p>{data?.description}</p>
+        <p className="challenge-detail-desc">{data?.description}</p>
 
         <div className="challenge-info" style={{ marginTop: 12 }}>
           <div className="info-item">

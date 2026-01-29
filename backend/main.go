@@ -35,6 +35,10 @@ func main() {
 	// Global middleware: logger, CORS, rate limiting
 	r.Use(middleware.Logger(), middleware.Cors(), middleware.RateLimit())
 
+	// 静态资源：上传图片
+	// Serve uploaded images
+	r.Static("/uploads", "./uploads")
+
 	// 健康检查（无需认证）
 	// Health check (no authentication required)
 	r.GET("/api/v1/health", controller.Health)
@@ -46,6 +50,9 @@ func main() {
 		// 用户认证（Solana 钱包登录）
 		// User authentication (Solana wallet login)
 		api.POST("/auth/wallet", controller.WalletAuth)
+
+		// 图片上传（需要登录）
+		api.POST("/upload/image", middleware.Auth(), controller.UploadImage)
 
 		// 环保行为相关
 		// Environmental behavior related
@@ -68,11 +75,13 @@ func main() {
 		// Marketing activity related
 		api.POST("/marketing/activities", middleware.Auth(), controller.CreateMarketingActivity)
 		api.GET("/marketing/activities", controller.GetMarketingActivities)
+		api.GET("/marketing/activities/:id/me", middleware.Auth(), controller.GetMyMarketingActivityStatus)
 		api.POST("/marketing/activities/:id/join", middleware.Auth(), controller.JoinMarketingActivity)
 		api.POST("/marketing/activities/:id/claim", middleware.Auth(), controller.ClaimMarketingReward)
 
 		// 运营管理相关
 		// Operations management related
+		api.GET("/admin/me", middleware.Auth(), controller.AdminMe)
 		api.GET("/admin/stats", middleware.Auth(), controller.GetAdminStats)
 		api.GET("/admin/analytics", middleware.Auth(), controller.GetAnalytics)
 		api.POST("/admin/activities/:id/activate", middleware.Auth(), controller.ActivateMarketingActivity)

@@ -145,17 +145,31 @@ export const BehaviorStatus = () => {
               <div className="detail-item">
                 <strong>媒体文件:</strong>
                 <div className="media-list">
-                  {behavior.media_urls.map((url, idx) => (
-                    <a 
-                      key={idx}
-                      href={url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="media-link"
-                    >
-                      文件 {idx + 1}
-                    </a>
-                  ))}
+                  {behavior.media_urls.map((url, idx) => {
+                    const lower = String(url).toLowerCase();
+                    const isImage = ['.png', '.jpg', '.jpeg', '.webp', '.gif'].some(ext => lower.includes(ext));
+                    const isVideo = ['.mp4', '.webm', '.mov'].some(ext => lower.includes(ext));
+                    return (
+                      <div key={idx} className="media-card">
+                        {isImage ? (
+                          <a href={url} target="_blank" rel="noopener noreferrer">
+                            <img src={url} alt={`媒体文件 ${idx + 1}`} className="media-thumb" />
+                          </a>
+                        ) : isVideo ? (
+                          <video src={url} controls className="media-thumb" />
+                        ) : (
+                          <a 
+                            href={url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="media-link"
+                          >
+                            文件 {idx + 1}
+                          </a>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}

@@ -254,35 +254,8 @@ func handleSignIn(activityID, walletAddr string) (*model.MarketingParticipant, e
 
 // handleInvite 处理邀请活动
 func handleInvite(activityID, walletAddr string, c *gin.Context) (*model.MarketingParticipant, error) {
-	var req struct {
-		InviteeAddr string `json:"invitee_addr" binding:"required"`
-	}
-
-	if err := c.ShouldBindJSON(&req); err != nil {
-		return nil, err
-	}
-
-	// 检查是否已邀请过此人
-	var existing model.InviteRecord
-	if err := config.DB.Where("inviter_addr = ? AND invitee_addr = ? AND activity_id = ?",
-		walletAddr, req.InviteeAddr, activityID).First(&existing).Error; err == nil {
-		return nil, fmt.Errorf("已邀请过此用户")
-	}
-
-	// 创建邀请记录
-	inviteRecord := &model.InviteRecord{
-		ID:          uuid.New().String(),
-		InviterAddr: walletAddr,
-		InviteeAddr: req.InviteeAddr,
-		ActivityID:  activityID,
-		InvitedAt:   time.Now(),
-	}
-
-	if err := config.DB.Create(inviteRecord).Error; err != nil {
-		return nil, err
-	}
-
-	// 创建参与者记录
+	// 按项目文档：参与活动接口无需 body。
+	// Invite 活动这里先登记“参与”，具体邀请链路可由后续业务（如被邀请人注册/完成行为）触发记录。
 	participant := &model.MarketingParticipant{
 		ID:         uuid.New().String(),
 		ActivityID: activityID,
@@ -295,23 +268,13 @@ func handleInvite(activityID, walletAddr string, c *gin.Context) (*model.Marketi
 
 // handleDailyTask 处理每日任务
 func handleDailyTask(activityID, walletAddr string, c *gin.Context) (*model.MarketingParticipant, error) {
-	var req struct {
-		TaskID string `json:"task_id" binding:"required"`
-	}
-
-	if err := c.ShouldBindJSON(&req); err != nil {
-		return nil, err
-	}
-
-	// TODO: 验证任务完成情况
-	// 这里简化处理，实际应检查任务是否真正完成
-
+	// 按项目文档：参与活动接口无需 body。
+	// 任务校验应由后续业务逻辑/链上或行为记录验证完成情况。
 	participant := &model.MarketingParticipant{
 		ID:         uuid.New().String(),
 		ActivityID: activityID,
 		WalletAddr: walletAddr,
 		JoinedAt:   time.Now(),
-		ExtraData:  fmt.Sprintf(`{"task_id": "%s"}`, req.TaskID),
 	}
 
 	return participant, config.DB.Create(participant).Error

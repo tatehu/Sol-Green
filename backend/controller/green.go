@@ -180,7 +180,11 @@ func GetUserBehaviors(c *gin.Context) {
 		query = query.Where("behavior_type = ?", behaviorType)
 	}
 
-	query.Order("created_at DESC").Find(&behaviors)
+	// GreenBehavior 模型没有 created_at 字段；用 submit_time 作为排序依据
+	if err := query.Order("submit_time DESC").Find(&behaviors).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "查询失败", "detail": err.Error()})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"data":  behaviors,
