@@ -3,10 +3,10 @@ resolution = true
 skip-lint = false
 
 [programs.devnet]
-sol-green = "SoLGrEEn1111111111111111111111111111111111"
+sol-green = "B7855fmCRGNGeFBh8R4tuDSdYkzeqpnqvxKcNMQsPmnE"
 
 [programs.mainnet]
-sol-green = "SoLGrEEn1111111111111111111111111111111111"
+sol-green = "B7855fmCRGNGeFBh8R4tuDSdYkzeqpnqvxKcNMQsPmnE"
 
 [registry]
 url = "https://api.apr.dev"

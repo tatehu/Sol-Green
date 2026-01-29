@@ -17,7 +17,7 @@ func SubmitGreenBehavior(c *gin.Context) {
 	var req model.GreenBehaviorReq
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "参数错误", // "Invalid parameters"
+			"error":    "参数错误", // "Invalid parameters"
 			"error_en": "Invalid parameters",
 		})
 		return
@@ -28,7 +28,7 @@ func SubmitGreenBehavior(c *gin.Context) {
 	walletAddr := c.GetString("wallet_addr")
 	if walletAddr == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{
-			"error": "未登录", // "Unauthorized"
+			"error":    "未登录", // "Unauthorized"
 			"error_en": "Unauthorized",
 		})
 		return
@@ -39,7 +39,7 @@ func SubmitGreenBehavior(c *gin.Context) {
 	lockKey := "green:submit:lock:" + walletAddr + ":" + req.BehaviorType
 	if config.RedisClient.Exists(c, lockKey).Val() > 0 {
 		c.JSON(http.StatusTooManyRequests, gin.H{
-			"error": "请勿重复提交", // "Please do not submit duplicate"
+			"error":    "请勿重复提交", // "Please do not submit duplicate"
 			"error_en": "Please do not submit duplicate",
 		})
 		return
@@ -49,7 +49,20 @@ func SubmitGreenBehavior(c *gin.Context) {
 	// 3. AI 反欺诈检测（图片/视频真实性）
 	// 3. AI fraud detection (image/video authenticity)
 	fraudScore, isFraud := config.AIFraudDetector.Detect(req.MediaURLs)
-	if isFraud || fraudScore > 0.7 { // 欺诈分数>0.7 判定为可疑 / Fraud score > 0.7 considered suspicious
+	threshold := config.GetAIFraudThreshold()
+	rewardCfg := config.GetRewardConfig()
+	var rewardAmount uint64
+	switch req.BehaviorType {
+	case "waste_sorting":
+		rewardAmount = rewardCfg.WasteSortingReward
+	case "tree_planting":
+		rewardAmount = rewardCfg.TreePlantingReward
+	case "low_carbon_travel":
+		rewardAmount = rewardCfg.LowCarbonTravelReward
+	default:
+		rewardAmount = rewardCfg.WasteSortingReward
+	}
+	if isFraud || fraudScore >= threshold { // 对齐文档：阈值由环境控制（主网更严格）
 		// 记录可疑行为，进入人工审核
 		// Record suspicious behavior, enter manual review
 		behavior := &model.GreenBehavior{
@@ -64,10 +77,12 @@ func SubmitGreenBehavior(c *gin.Context) {
 		}
 		config.DB.Create(behavior)
 		c.JSON(http.StatusOK, gin.H{
-			"msg":    "提交成功，进入人工审核", // "Submission successful, pending manual review"
-			"msg_en": "Submission successful, pending manual review",
-			"id":     behavior.ID,
-			"status": behavior.Status,
+			"msg":           "提交成功，进入人工审核", // "Submission successful, pending manual review"
+			"msg_en":        "Submission successful, pending manual review",
+			"id":            behavior.ID,
+			"status":        behavior.Status,
+			"fraud_score":   fraudScore,
+			"reward_amount": rewardAmount,
 		})
 		return
 	}
@@ -94,9 +109,9 @@ func SubmitGreenBehavior(c *gin.Context) {
 	if err != nil {
 		config.Log.Errorf("奖励发放失败: %v", err) // "Reward distribution failed"
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "奖励发放失败", // "Reward distribution failed"
+			"error":    "奖励发放失败", // "Reward distribution failed"
 			"error_en": "Reward distribution failed",
-			"detail": err.Error(),
+			"detail":   err.Error(),
 		})
 		return
 	}
@@ -117,12 +132,14 @@ func SubmitGreenBehavior(c *gin.Context) {
 	config.DB.Save(behavior)
 
 	c.JSON(http.StatusOK, gin.H{
-		"msg":      "认证通过，奖励已发放", // "Verification passed, reward distributed"
-		"msg_en":   "Verification passed, reward distributed",
-		"id":       behavior.ID,
-		"status":   behavior.Status,
-		"tx_hash":  txHash,
-		"proof":    proofHash,
+		"msg":           "认证通过，奖励已发放", // "Verification passed, reward distributed"
+		"msg_en":        "Verification passed, reward distributed",
+		"id":            behavior.ID,
+		"status":        behavior.Status,
+		"fraud_score":   fraudScore,
+		"reward_amount": rewardAmount,
+		"tx_hash":       txHash,
+		"proof":         proofHash,
 	})
 }
 
@@ -133,12 +150,42 @@ func GetBehaviorStatus(c *gin.Context) {
 	var behavior model.GreenBehavior
 	if err := config.DB.Where("id = ?", id).First(&behavior).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
-			"error": "行为记录不存在", // "Behavior record not found"
+			"error":    "行为记录不存在", // "Behavior record not found"
 			"error_en": "Behavior record not found",
 		})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"data": behavior})
+}
+
+// GetUserBehaviors 获取用户的行为记录列表
+// GetUserBehaviors gets user's behavior records list
+func GetUserBehaviors(c *gin.Context) {
+	walletAddr := c.GetString("wallet_addr")
+	if walletAddr == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "未登录"})
+		return
+	}
+
+	status := c.Query("status")              // 可选：过滤状态，如 "approved"
+	behaviorType := c.Query("behavior_type") // 可选：过滤行为类型
+
+	var behaviors []model.GreenBehavior
+	query := config.DB.Where("wallet_addr = ?", walletAddr)
+
+	if status != "" {
+		query = query.Where("status = ?", status)
+	}
+	if behaviorType != "" {
+		query = query.Where("behavior_type = ?", behaviorType)
+	}
+
+	query.Order("created_at DESC").Find(&behaviors)
+
+	c.JSON(http.StatusOK, gin.H{
+		"data":  behaviors,
+		"total": len(behaviors),
+	})
 }
 
 // ClaimReward 领取奖励
@@ -156,7 +203,7 @@ func ClaimReward(c *gin.Context) {
 // PartnerVerifyReq 第三方认证请求
 type PartnerVerifyReq struct {
 	BehaviorID string `json:"behavior_id" binding:"required"`
-	PartnerID  string `json:"partner_id" binding:"required"` // 认证机构 ID
+	PartnerID  string `json:"partner_id" binding:"required"`  // 认证机构 ID
 	VerifyCode string `json:"verify_code" binding:"required"` // 认证码
 }
 

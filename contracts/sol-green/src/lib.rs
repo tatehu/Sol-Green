@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Token, TokenAccount, Transfer};
 
 // 合约程序 ID（需替换为实际部署的 ID）
-declare_id!("SoLGrEEn1111111111111111111111111111111111");
+declare_id!("B7855fmCRGNGeFBh8R4tuDSdYkzeqpnqvxKcNMQsPmnE");
 
 #[program]
 pub mod sol_green {

@@ -13,9 +13,32 @@ import (
 
 // CreateChallenge 创建挑战活动
 func CreateChallenge(c *gin.Context) {
-	var req model.ChallengeReq
+	// 使用 string 接收时间字段，避免 Gin 直接按 RFC3339 解析导致 datetime-local（如 2026-01-25T02:07）报错
+	var req struct {
+		Title         string `json:"title" binding:"required"`
+		Description   string `json:"description" binding:"required"`
+		ChallengeType string `json:"challenge_type" binding:"required,oneof=individual team community"`
+		BehaviorType  string `json:"behavior_type" binding:"required,oneof=waste_sorting tree_planting low_carbon_travel"`
+		RewardAmount  uint64 `json:"reward_amount" binding:"required,min=1"`
+		TargetCount   int    `json:"target_count" binding:"required,min=1"`
+		StartTime     string `json:"start_time" binding:"required"`
+		EndTime       string `json:"end_time" binding:"required"`
+		ImageURL      string `json:"image_url,omitempty"`
+		Rules         string `json:"rules,omitempty"`
+	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误", "detail": err.Error()})
+		return
+	}
+
+	startTime, err := parseFlexibleTime(req.StartTime)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误", "detail": "start_time: " + err.Error()})
+		return
+	}
+	endTime, err := parseFlexibleTime(req.EndTime)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误", "detail": "end_time: " + err.Error()})
 		return
 	}
 
@@ -27,12 +50,12 @@ func CreateChallenge(c *gin.Context) {
 	}
 
 	// 验证时间
-	if req.EndTime.Before(req.StartTime) {
+	if endTime.Before(startTime) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "结束时间必须晚于开始时间"})
 		return
 	}
 
-	if req.EndTime.Before(time.Now()) {
+	if endTime.Before(time.Now()) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "结束时间不能早于当前时间"})
 		return
 	}
@@ -47,8 +70,8 @@ func CreateChallenge(c *gin.Context) {
 		RewardAmount:  req.RewardAmount,
 		TargetCount:   req.TargetCount,
 		CurrentCount:  0,
-		StartTime:     req.StartTime,
-		EndTime:       req.EndTime,
+		StartTime:     startTime,
+		EndTime:       endTime,
 		Status:        model.ChallengeStatusDraft,
 		CreatorWallet: walletAddr,
 		ImageURL:      req.ImageURL,
@@ -63,8 +86,8 @@ func CreateChallenge(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"msg":   "挑战创建成功",
-		"data":  challenge,
+		"msg":  "挑战创建成功",
+		"data": challenge,
 	})
 }
 
@@ -85,9 +108,12 @@ func GetChallenges(c *gin.Context) {
 		query = query.Where("challenge_type = ?", challengeType)
 	}
 
-	// 只显示进行中或即将开始的挑战
-	query = query.Where("status IN ?", []string{model.ChallengeStatusActive, model.ChallengeStatusDraft})
-	query = query.Where("end_time >= ?", time.Now())
+	// 默认只显示进行中或草稿（即将开始）；如果显式传了 status，则尊重调用方
+	if status == "" {
+		query = query.Where("status IN ?", []string{model.ChallengeStatusActive, model.ChallengeStatusDraft})
+		// 默认过滤掉已结束的
+		query = query.Where("end_time >= ?", time.Now())
+	}
 
 	var total int64
 	query.Count(&total)
@@ -97,9 +123,9 @@ func GetChallenges(c *gin.Context) {
 	query.Offset(offset).Limit(parseInt(pageSize)).Order("created_at DESC").Find(&challenges)
 
 	c.JSON(http.StatusOK, gin.H{
-		"data": challenges,
-		"total": total,
-		"page": parseInt(page),
+		"data":      challenges,
+		"total":     total,
+		"page":      parseInt(page),
 		"page_size": parseInt(pageSize),
 	})
 }
@@ -122,17 +148,20 @@ func GetChallengeDetail(c *gin.Context) {
 	config.DB.Where("challenge_id = ?", id).Order("joined_at DESC").Limit(10).Find(&participants)
 
 	c.JSON(http.StatusOK, gin.H{
-		"data": challenge,
+		"data":              challenge,
 		"participant_count": participantCount,
-		"participants": participants,
+		"participants":      participants,
 	})
 }
 
 // JoinChallenge 参与挑战
 func JoinChallenge(c *gin.Context) {
-	var req model.JoinChallengeReq
+	challengeID := c.Param("id")
+	var req struct {
+		BehaviorID string `json:"behavior_id" binding:"required"`
+	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误", "detail": err.Error()})
 		return
 	}
 
@@ -144,27 +173,36 @@ func JoinChallenge(c *gin.Context) {
 
 	// 检查挑战是否存在
 	var challenge model.Challenge
-	if err := config.DB.Where("id = ?", req.ChallengeID).First(&challenge).Error; err != nil {
+	if err := config.DB.Where("id = ?", challengeID).First(&challenge).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "挑战不存在"})
-		return
-	}
-
-	// 检查挑战状态
-	if challenge.Status != model.ChallengeStatusActive {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "挑战未开始或已结束"})
 		return
 	}
 
 	// 检查时间
 	now := time.Now()
-	if now.Before(challenge.StartTime) || now.After(challenge.EndTime) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "不在挑战时间范围内"})
+	if now.Before(challenge.StartTime) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "挑战尚未开始"})
 		return
+	}
+	if now.After(challenge.EndTime) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "挑战已结束"})
+		return
+	}
+
+	// 检查挑战状态：允许active或draft（但时间已到）的挑战参与
+	if challenge.Status == model.ChallengeStatusCompleted || challenge.Status == model.ChallengeStatusCancelled {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "挑战已结束或已取消"})
+		return
+	}
+	// 如果状态是draft但时间已到，自动激活
+	if challenge.Status == model.ChallengeStatusDraft && now.After(challenge.StartTime) && now.Before(challenge.EndTime) {
+		config.DB.Model(&challenge).Update("status", model.ChallengeStatusActive)
+		challenge.Status = model.ChallengeStatusActive
 	}
 
 	// 检查是否已参与
 	var existing model.ChallengeParticipant
-	if err := config.DB.Where("challenge_id = ? AND wallet_addr = ?", req.ChallengeID, walletAddr).First(&existing).Error; err == nil {
+	if err := config.DB.Where("challenge_id = ? AND wallet_addr = ?", challengeID, walletAddr).First(&existing).Error; err == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "您已参与此挑战"})
 		return
 	}
@@ -176,13 +214,19 @@ func JoinChallenge(c *gin.Context) {
 		return
 	}
 
+	// 检查行为类型是否匹配挑战要求
+	if behavior.BehaviorType != challenge.BehaviorType {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "行为类型不匹配挑战要求"})
+		return
+	}
+
 	// 创建参与者记录
 	participant := &model.ChallengeParticipant{
-		ID:           uuid.New().String(),
-		ChallengeID:  req.ChallengeID,
-		WalletAddr:   walletAddr,
-		BehaviorID:   req.BehaviorID,
-		JoinedAt:     time.Now(),
+		ID:            uuid.New().String(),
+		ChallengeID:   challengeID,
+		WalletAddr:    walletAddr,
+		BehaviorID:    req.BehaviorID,
+		JoinedAt:      time.Now(),
 		RewardClaimed: false,
 	}
 
@@ -200,7 +244,7 @@ func JoinChallenge(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"msg": "成功参与挑战",
+		"msg":  "成功参与挑战",
 		"data": participant,
 	})
 }
@@ -239,8 +283,24 @@ func ClaimChallengeReward(c *gin.Context) {
 		return
 	}
 
-	// 发放奖励
-	txHash, err := service.MintReward(walletAddr, challenge.BehaviorType)
+	// 发放奖励（对齐文档：baseReward + baseReward*challengeBonusRate）
+	rewardCfg := config.GetRewardConfig()
+	var baseReward uint64
+	switch challenge.BehaviorType {
+	case "waste_sorting":
+		baseReward = rewardCfg.WasteSortingReward
+	case "tree_planting":
+		baseReward = rewardCfg.TreePlantingReward
+	case "low_carbon_travel":
+		baseReward = rewardCfg.LowCarbonTravelReward
+	default:
+		baseReward = rewardCfg.WasteSortingReward
+	}
+
+	bonus := uint64(float64(baseReward) * rewardCfg.ChallengeBonusRate)
+	totalReward := baseReward + bonus
+
+	txHash, err := service.MintRewardMultiChain(walletAddr, "challenge_reward", totalReward)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "奖励发放失败", "detail": err.Error()})
 		return
@@ -288,7 +348,7 @@ func ActivateChallenge(c *gin.Context) {
 	config.DB.Save(&challenge)
 
 	c.JSON(http.StatusOK, gin.H{
-		"msg": "挑战已激活",
+		"msg":  "挑战已激活",
 		"data": challenge,
 	})
 }

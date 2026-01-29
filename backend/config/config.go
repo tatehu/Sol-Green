@@ -24,8 +24,14 @@ var (
 
 // InitConfig 初始化配置
 func InitConfig() {
-	// 加载 .env 文件
-	_ = godotenv.Load()
+	// 加载 .env 文件（覆盖常见几种运行目录：项目根目录、backend、backend/config）
+	_ = godotenv.Load(
+		".env",         // 当前目录
+		"../.env",      // 上一级目录
+		"../../.env",   // 再上一级（例如从 backend/config 运行）
+		"config/.env",  // 项目根目录下的 config/.env（如果存在）
+		"backend/.env", // 项目根目录下的 backend/.env（如果存在）
+	)
 
 	// 初始化日志
 	Log = logrus.New()
@@ -105,6 +111,7 @@ func InitAIFraudDetector() {
 func GetEnv(key, defaultValue string) string {
 	value := os.Getenv(key)
 	if value == "" {
+		// 当环境变量未设置时，返回调用方提供的默认值
 		return defaultValue
 	}
 	return value

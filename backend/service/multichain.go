@@ -40,7 +40,8 @@ func MintRewardMultiChain(walletAddr, behaviorType string, amount uint64) (strin
 	
 	switch chain {
 	case ChainSolana:
-		return MintReward(walletAddr, behaviorType)
+		// 对 Solana 链优先按 amount 发放（用于挑战倍率/营销奖励等）
+		return MintRewardAmount(walletAddr, amount)
 	case ChainEthereum:
 		return MintRewardEthereum(walletAddr, amount)
 	case ChainPolygon:
@@ -48,7 +49,7 @@ func MintRewardMultiChain(walletAddr, behaviorType string, amount uint64) (strin
 	case ChainBSC:
 		return MintRewardBSC(walletAddr, amount)
 	default:
-		return MintReward(walletAddr, behaviorType)
+		return MintRewardAmount(walletAddr, amount)
 	}
 }
 
