@@ -6,6 +6,18 @@ Sol-Green 是一个基于 Solana 区块链的去中心化环保行为记录与�
 
 ## 🎬 项目演示
 
+**🎥 项目演示视频：**
+- [点击观看 Sol-Green 演示 Part 1](./assets/Sol%20Green%20Part%201.mov)
+- [点击观看 Sol-Green 演示 Part 2](./assets/Sol%20Green%20Part%202.mov)
+
+<video src="./assets/Sol%20Green%20Part%201.mov" controls width="640">
+  您的浏览器不支持 video 标签，请直接点击上方链接观看 Part 1 视频。
+</video>
+
+<video src="./assets/Sol%20Green%20Part%202.mov" controls width="640">
+  您的浏览器不支持 video 标签，请直接点击上方链接观看 Part 2 视频。
+</video>
+
 **📖 详细项目介绍（含功能截图，按使用流程组织）：**
 - [中文版项目介绍](./PROJECT_INTRO_CN.md) - 包含18张功能展示图片，从主页面到具体操作详情
 - [English Project Introduction](./PROJECT_INTRO_EN.md) - Complete feature demonstrations with 18 images
