@@ -79,6 +79,10 @@ npm start
 
 查看完整的功能演示图片和说明：[功能演示文档](./docs/FEATURE_DEMONSTRATION.md)
 
+## 📸 功能演示视频
+
+查看完整的功能演示视频：[功能演示视频](./assets/Sol Green Part 1.mov ./assets/Sol Green Part 2.mov)
+
 ## 🤝 贡献
 
 欢迎提交 Issue 和 Pull Request！
