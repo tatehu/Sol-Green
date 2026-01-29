@@ -1,0 +1,5 @@
+*.mov filter=lfs diff=lfs merge=lfs -text
+assets/Sol[[:space:]]Green[[:space:]]Part[[:space:]]1.mov filter=lfs diff=lfs merge=lfs -text
+assets/Sol[[:space:]]Green[[:space:]]Part[[:space:]]2.mov filter=lfs diff=lfs merge=lfs -text
+./assets/Sol[[:space:]]Green[[:space:]]Part[[:space:]]1.mov filter=lfs diff=lfs merge=lfs -text
+./assets/Sol[[:space:]]Green[[:space:]]Part[[:space:]]2.mov filter=lfs diff=lfs merge=lfs -text
