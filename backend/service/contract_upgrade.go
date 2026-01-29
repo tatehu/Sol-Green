@@ -95,10 +95,14 @@ func (cum *ContractUpgradeManager) ExecuteUpgrade(programID, newProgramID string
 		return "", err
 	}
 
-	// 构建升级交易
+	// 构建升级交易（占位实现）
 	// 实际实现需要使用 Solana 的升级指令
 	ctx := context.Background()
-	
+
+	// 避免未使用变量告警（后续实现真实逻辑时可删除）
+	_ = adminPrivKey
+	_ = ctx
+
 	config.Log.Infof("执行合约升级: %s -> %s", programID, newProgramID)
 	
 	// TODO: 实现实际的升级逻辑

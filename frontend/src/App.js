@@ -1,6 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
-import { WalletConnect } from './components/WalletConnect';
+import { WalletContextProvider, WalletConnect } from './components/WalletConnect';
 import { GreenSubmit } from './pages/GreenSubmit';
 import { BehaviorStatus } from './pages/BehaviorStatus';
 import { Challenges } from './pages/Challenges';
@@ -9,37 +9,39 @@ import './App.css';
 
 function App() {
   return (
-    <Router>
-      <div className="App">
-        <nav className="navbar">
-          <div className="container">
-            <Link to="/" className="logo">
-              <h1>🌱 Sol-Green</h1>
-            </Link>
-            <div className="nav-links">
-              <Link to="/">首页</Link>
-              <Link to="/submit">提交行为</Link>
-              <Link to="/challenges">挑战活动</Link>
-              <Link to="/marketing">营销活动</Link>
-              <Link to="/status">查询状态</Link>
-              <WalletConnect />
+    <WalletContextProvider>
+      <Router>
+        <div className="App">
+          <nav className="navbar">
+            <div className="container">
+              <Link to="/" className="logo">
+                <h1>🌱 Sol-Green</h1>
+              </Link>
+              <div className="nav-links">
+                <Link to="/">首页</Link>
+                <Link to="/submit">提交行为</Link>
+                <Link to="/challenges">挑战活动</Link>
+                <Link to="/marketing">营销活动</Link>
+                <Link to="/status">查询状态</Link>
+                <WalletConnect />
+              </div>
             </div>
-          </div>
-        </nav>
+          </nav>
 
-        <main className="main-content">
-          <div className="container">
-            <Routes>
-              <Route path="/" element={<Home />} />
-              <Route path="/submit" element={<GreenSubmit />} />
-              <Route path="/challenges" element={<Challenges />} />
-              <Route path="/marketing" element={<Marketing />} />
-              <Route path="/status" element={<BehaviorStatus />} />
-            </Routes>
-          </div>
-        </main>
-      </div>
-    </Router>
+          <main className="main-content">
+            <div className="container">
+              <Routes>
+                <Route path="/" element={<Home />} />
+                <Route path="/submit" element={<GreenSubmit />} />
+                <Route path="/challenges" element={<Challenges />} />
+                <Route path="/marketing" element={<Marketing />} />
+                <Route path="/status" element={<BehaviorStatus />} />
+              </Routes>
+            </div>
+          </main>
+        </div>
+      </Router>
+    </WalletContextProvider>
   );
 }
 

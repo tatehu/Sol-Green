@@ -88,7 +88,7 @@ cp .env.example .env
 #### 方式一：使用 Docker Compose（推荐）
 
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 #### 方式二：本地运行
@@ -131,6 +131,33 @@ avm use latest
 
 # 构建合约
 ./scripts/build-contract.sh
+
+
+Wrote new keypair to target/deploy/sol_green-keypair.json
+=================================================================================
+pubkey: 5hfbcr5sTcG392y8XFMmJnUZ5oESkWPLPXDVK83fisXH
+=================================================================================
+Save this seed phrase and your BIP39 passphrase to recover your new keypair:
+unable vendor impact balcony private oppose brisk spell sudden scrap define movie
+=================================================================================
+5hfbcr5sTcG392y8XFMmJnUZ5oESkWPLPXDVK83fisXH
+
+
+Wrote new keypair to /Users/tate/.config/solana/sol-green-admin.json
+=====================================================================
+pubkey: 4dsDrppmwmsoYwmZbojXSiDCrsxETzSwwWUgTKEwdhMq
+=====================================================================
+Save this seed phrase and your BIP39 passphrase to recover your new keypair:
+hard raise tenant smart calm cup head wheel various settle area pitch
+=====================================================================
+
+============================================================================
+pubkey: B7855fmCRGNGeFBh8R4tuDSdYkzeqpnqvxKcNMQsPmnE
+============================================================================
+Save this seed phrase and your BIP39 passphrase to recover your new keypair:
+million avocado flash giggle surge adapt ethics job below mixed skate annual
+============================================================================
+B7855fmCRGNGeFBh8R4tuDSdYkzeqpnqvxKcNMQsPmnE
 
 # 部署到测试网
 cd contracts/sol-green

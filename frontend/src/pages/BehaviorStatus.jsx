@@ -6,7 +6,7 @@ import './BehaviorStatus.css';
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8080';
 
 export const BehaviorStatus = () => {
-  const { publicKey } = useWalletContext();
+  useWalletContext(); // 保持钱包上下文挂载（未来可能用于快捷填充/校验）
   const [behaviorId, setBehaviorId] = useState('');
   const [loading, setLoading] = useState(false);
   const [behavior, setBehavior] = useState(null);

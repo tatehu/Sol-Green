@@ -2,20 +2,65 @@ package service
 
 import (
 	"context"
-	"fmt"
-	"os"
+	"errors"
+	"net"
 	"sol-green/config"
+	"strings"
 	"time"
 
 	"github.com/gagliardetto/solana-go"
 	"github.com/gagliardetto/solana-go/rpc"
-	"github.com/gagliardetto/solana-go/rpc/ws"
 )
+
+const (
+	listenerRPCTimeout = 5 * time.Second
+	listenerRPCRetries = 2
+)
+
+func listenerIsRetryable(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+		return true
+	}
+	var ne net.Error
+	if errors.As(err, &ne) {
+		return ne.Timeout() || ne.Temporary()
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "timeout") || strings.Contains(msg, "timed out")
+}
+
+func (bl *BlockchainListener) getSignaturesWithRetry(ctx context.Context, programID solana.PublicKey) ([]*rpc.TransactionSignature, error) {
+	var lastErr error
+	for attempt := 0; attempt <= listenerRPCRetries; attempt++ {
+		callCtx, cancel := context.WithTimeout(ctx, listenerRPCTimeout)
+		limit := 20
+		sigs, err := bl.solanaClient.GetSignaturesForAddressWithOpts(
+			callCtx,
+			programID,
+			&rpc.GetSignaturesForAddressOpts{
+				Limit:      &limit,
+				Commitment: rpc.CommitmentConfirmed,
+			},
+		)
+		cancel()
+		if err == nil {
+			return sigs, nil
+		}
+		lastErr = err
+		if !listenerIsRetryable(err) || attempt == listenerRPCRetries {
+			return nil, err
+		}
+		time.Sleep(time.Duration(attempt+1) * 300 * time.Millisecond)
+	}
+	return nil, lastErr
+}
 
 // BlockchainListener 区块链监听服务
 type BlockchainListener struct {
 	solanaClient *rpc.Client
-	wsClient     *ws.Client
 	ctx          context.Context
 	cancel       context.CancelFunc
 }
@@ -36,39 +81,15 @@ func NewBlockchainListener() (*BlockchainListener, error) {
 
 // StartListening 开始监听链上事件
 func (bl *BlockchainListener) StartListening() error {
-	// 监听程序账户变化
-	programID := solana.MustPublicKeyFromBase58(config.SolanaProofContract())
-	if programID.IsZero() {
-		return fmt.Errorf("程序 ID 未配置")
-	}
-
-	// 使用 WebSocket 订阅账户变化
-	wsURL := config.GetSolanaWSURL()
-	wsClient, err := ws.Connect(bl.ctx, wsURL)
-	if err != nil {
-		config.Log.Warnf("WebSocket 连接失败，使用轮询模式: %v", err)
-		return bl.startPolling()
-	}
-
-	bl.wsClient = wsClient
-
-	// 订阅账户通知
-	sub, err := wsClient.AccountSubscribe(programID, rpc.CommitmentFinalized)
-	if err != nil {
-		config.Log.Warnf("账户订阅失败，使用轮询模式: %v", err)
-		return bl.startPolling()
-	}
-
-	go bl.handleAccountUpdates(sub)
-
-	config.Log.Info("区块链监听服务已启动")
-	return nil
+	// 简化版本：当前只启用轮询模式，避免依赖 WebSocket API 变更导致编译错误。
+	// Simple version: only use polling for now.
+	return bl.startPolling()
 }
 
 // startPolling 启动轮询模式
 func (bl *BlockchainListener) startPolling() error {
 	ticker := time.NewTicker(10 * time.Second)
-	
+
 	go func() {
 		for {
 			select {
@@ -84,49 +105,34 @@ func (bl *BlockchainListener) startPolling() error {
 	return nil
 }
 
-// handleAccountUpdates 处理账户更新
-func (bl *BlockchainListener) handleAccountUpdates(sub *ws.AccountSubscription) {
-	defer sub.Unsubscribe()
-	for {
-		select {
-		case <-bl.ctx.Done():
-			return
-		case update, ok := <-sub.Recv():
-			if !ok {
-				config.Log.Warn("账户订阅通道已关闭")
-				return
-			}
-			if update != nil {
-				bl.processAccountUpdate(update)
-			}
-		}
-	}
-}
-
-// processAccountUpdate 处理账户更新
-func (bl *BlockchainListener) processAccountUpdate(update *ws.AccountResult) {
-	if update == nil || update.Value == nil {
-		return
-	}
-	// 解析账户数据，提取交易信息
-	config.Log.Infof("收到账户更新: %v", update.Value.Account.Owner.String())
-	
-	// 记录到数据库
-	// TODO: 保存交易数据到数据库
-}
-
 // pollTransactions 轮询交易
 func (bl *BlockchainListener) pollTransactions() {
-	// 获取最近的交易
-	signatures, err := bl.solanaClient.GetSignaturesForAddress(
-		bl.ctx,
-		solana.MustPublicKeyFromBase58(config.SolanaProofContract()),
-		&rpc.GetSignaturesForAddressOpts{
-			Limit: rpc.UintPtr(10),
-		},
-	)
+	contractStr := config.SolanaProofContract()
+	if contractStr == "" {
+		config.Log.Warn("存证合约地址未配置，跳过交易轮询")
+		return
+	}
+
+	programID := solana.MustPublicKeyFromBase58(contractStr)
+	if programID.IsZero() {
+		config.Log.Warn("程序 ID 无效，跳过交易轮询")
+		return
+	}
+
+	// 获取最近的交易（超时 + 小范围重试 + 数量限制）
+	signatures, err := bl.getSignaturesWithRetry(bl.ctx, programID)
 	if err != nil {
-		config.Log.Errorf("获取交易签名失败: %v", err)
+		// devnet 网络不稳定时避免刷屏 error
+		if listenerIsRetryable(err) {
+			config.Log.Warnf("获取交易签名失败（可能网络/RPC 不可达）: %v", err)
+		} else {
+			config.Log.Errorf("获取交易签名失败: %v", err)
+		}
+		return
+	}
+
+	if len(signatures) == 0 {
+		config.Log.Debug("未获取到新的交易签名")
 		return
 	}
 
@@ -138,19 +144,25 @@ func (bl *BlockchainListener) pollTransactions() {
 // processTransaction 处理交易
 func (bl *BlockchainListener) processTransaction(signature string) {
 	// 获取交易详情
+	ctx, cancel := context.WithTimeout(bl.ctx, listenerRPCTimeout)
+	defer cancel()
 	tx, err := bl.solanaClient.GetTransaction(
-		bl.ctx,
+		ctx,
 		solana.MustSignatureFromBase58(signature),
 		&rpc.GetTransactionOpts{},
 	)
 	if err != nil {
-		config.Log.Errorf("获取交易详情失败: %v", err)
+		if listenerIsRetryable(err) {
+			config.Log.Warnf("获取交易详情失败（可能网络/RPC 不可达）: %v", err)
+		} else {
+			config.Log.Errorf("获取交易详情失败: %v", err)
+		}
 		return
 	}
 
 	// 解析交易，提取事件
 	// TODO: 解析交易数据，提取奖励发放、存证等事件
-	
+
 	config.Log.Infof("处理交易: %s, 区块时间: %v", signature, tx.BlockTime)
 }
 
@@ -158,9 +170,6 @@ func (bl *BlockchainListener) processTransaction(signature string) {
 func (bl *BlockchainListener) Stop() {
 	if bl.cancel != nil {
 		bl.cancel()
-	}
-	if bl.wsClient != nil {
-		bl.wsClient.Close()
 	}
 	config.Log.Info("区块链监听服务已停止")
 }
@@ -176,18 +185,21 @@ func GetChainStats() (map[string]interface{}, error) {
 		return nil, err
 	}
 
-	// 获取程序账户信息
-	programID := solana.MustPublicKeyFromBase58(config.SolanaProofContract())
-	accountInfo, err := client.GetAccountInfo(ctx, programID)
-	if err != nil {
-		config.Log.Warnf("获取程序账户信息失败: %v", err)
+	stats := map[string]interface{}{
+		"current_slot": slot,
+		"timestamp":    time.Now().Unix(),
 	}
 
-	stats := map[string]interface{}{
-		"current_slot":    slot,
-		"program_id":      programID.String(),
-		"account_exists":  accountInfo != nil,
-		"timestamp":       time.Now().Unix(),
+	// 获取程序账户信息（如果已配置存证合约地址）
+	contractStr := config.SolanaProofContract()
+	if contractStr != "" {
+		programID := solana.MustPublicKeyFromBase58(contractStr)
+		accountInfo, err := client.GetAccountInfo(ctx, programID)
+		if err != nil {
+			config.Log.Warnf("获取程序账户信息失败: %v", err)
+		}
+		stats["program_id"] = programID.String()
+		stats["account_exists"] = accountInfo != nil
 	}
 
 	return stats, nil

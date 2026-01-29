@@ -134,12 +134,13 @@ func (fd *FraudDetector) getBaiduAccessToken() (string, error) {
 
 // checkBaiduImage 检查单张图片
 func (fd *FraudDetector) checkBaiduImage(accessToken, imageURL string) float64 {
-	// 调用百度图像审核 API
+	// 调用百度图像审核 API（此处仅记录日志，真实实现需要根据文档发起 HTTP 请求）
 	// API: https://aip.baidubce.com/rest/2.0/solution/v1/img_censor/v2/user_defined
 	// 返回风险分数
-	
-	apiURL := fmt.Sprintf("https://aip.baidubce.com/rest/2.0/solution/v1/img_censor/v2/user_defined?access_token=%s", accessToken)
-	
+
+	// 示例：构造请求 URL（当前仅用于说明，不实际请求）
+	_ = fmt.Sprintf("https://aip.baidubce.com/rest/2.0/solution/v1/img_censor/v2/user_defined?access_token=%s", accessToken)
+
 	// 构建请求（需要下载图片或使用图片 URL）
 	// 这里简化处理，实际需要根据百度 API 文档实现
 	
@@ -165,7 +166,7 @@ func (fd *FraudDetector) detectWithAliyun(mediaURLs []string) (float64, bool) {
 	// - 解析返回的风险分数
 	
 	maxScore := 0.0
-	for _, url := range mediaURLs {
+	for range mediaURLs {
 		// 调用阿里云 API
 		score := 0.3 // 示例分数，实际应从 API 响应解析
 		if score > maxScore {

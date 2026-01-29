@@ -34,7 +34,9 @@ func Auth() gin.HandlerFunc {
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 				return nil, jwt.ErrSignatureInvalid
 			}
-			return []byte(config.GetEnv("JWT_SECRET", "sol-green-secret")), nil
+			// 开发环境给一个兼容默认值，避免单测/本地未配置时全部 401
+			secret := config.GetEnv("JWT_SECRET", "sol-green-secret-key")
+			return []byte(secret), nil
 		})
 
 		if err != nil || !token.Valid {

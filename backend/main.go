@@ -5,6 +5,7 @@ import (
 	"sol-green/controller"
 	"sol-green/middleware"
 	"sol-green/service"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -45,14 +46,15 @@ func main() {
 		// 用户认证（Solana 钱包登录）
 		// User authentication (Solana wallet login)
 		api.POST("/auth/wallet", controller.WalletAuth)
-		
+
 		// 环保行为相关
 		// Environmental behavior related
 		api.POST("/green/behavior/submit", middleware.Auth(), controller.SubmitGreenBehavior)
 		api.GET("/green/behavior/:id", middleware.Auth(), controller.GetBehaviorStatus)
+		api.GET("/green/behaviors", middleware.Auth(), controller.GetUserBehaviors)
 		api.POST("/green/reward/claim", middleware.Auth(), controller.ClaimReward)
 		api.POST("/green/partner/verify", middleware.Auth(), controller.PartnerVerify)
-		
+
 		// 挑战活动相关
 		// Challenge activity related
 		api.POST("/challenges", middleware.Auth(), controller.CreateChallenge)
@@ -61,20 +63,20 @@ func main() {
 		api.POST("/challenges/:id/join", middleware.Auth(), controller.JoinChallenge)
 		api.POST("/challenges/:id/activate", middleware.Auth(), controller.ActivateChallenge)
 		api.POST("/challenges/:id/claim", middleware.Auth(), controller.ClaimChallengeReward)
-		
+
 		// 营销活动相关
 		// Marketing activity related
 		api.POST("/marketing/activities", middleware.Auth(), controller.CreateMarketingActivity)
 		api.GET("/marketing/activities", controller.GetMarketingActivities)
 		api.POST("/marketing/activities/:id/join", middleware.Auth(), controller.JoinMarketingActivity)
 		api.POST("/marketing/activities/:id/claim", middleware.Auth(), controller.ClaimMarketingReward)
-		
+
 		// 运营管理相关
 		// Operations management related
 		api.GET("/admin/stats", middleware.Auth(), controller.GetAdminStats)
 		api.GET("/admin/analytics", middleware.Auth(), controller.GetAnalytics)
 		api.POST("/admin/activities/:id/activate", middleware.Auth(), controller.ActivateMarketingActivity)
-		
+
 		// 合约管理相关
 		// Contract management related
 		api.GET("/admin/contract/info", middleware.Auth(), controller.GetContractInfo)

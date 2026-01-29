@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useWalletContext } from '../components/WalletConnect';
 import axios from 'axios';
 import './GreenSubmit.css';
@@ -14,9 +14,32 @@ export const GreenSubmit = () => {
   const [msg, setMsg] = useState('');
   const [result, setResult] = useState(null);
 
+  const behaviorText = useMemo(() => {
+    const map = {
+      waste_sorting: '🗑️ 垃圾分类',
+      tree_planting: '🌳 植树造林',
+      low_carbon_travel: '🚴 低碳出行',
+    };
+    return map[behaviorType] || behaviorType;
+  }, [behaviorType]);
+
+  const statusText = (status) => {
+    const map = {
+      approved: '✅ 已通过',
+      pending_review: '⏳ 待审核',
+      rejected: '❌ 已拒绝',
+    };
+    return map[status] || status;
+  };
+
   // 处理文件选择
   const handleFileChange = (e) => {
     const files = Array.from(e.target.files);
+    if (files.length > 5) {
+      setMsg('最多上传 5 个文件');
+      setMediaFiles(files.slice(0, 5));
+      return;
+    }
     setMediaFiles(files);
   };
 
@@ -62,6 +85,10 @@ export const GreenSubmit = () => {
     }
     if (mediaFiles.length === 0) {
       setMsg('请上传至少一张图片/视频');
+      return;
+    }
+    if (mediaFiles.length > 5) {
+      setMsg('最多上传 5 个文件');
       return;
     }
 
@@ -110,40 +137,40 @@ export const GreenSubmit = () => {
   return (
     <div className="green-submit">
       <div className="card">
-        <h2>🌱 环保行为申报 / Environmental Behavior Submission</h2>
+        <h2>🌱 环保行为申报</h2>
         
         {!publicKey && (
           <div className="alert">
-            <p>请先连接钱包 / Please connect wallet first</p>
+            <p>请先连接钱包</p>
           </div>
         )}
 
         <div className="form-group">
-          <label className="label">行为类型 / Behavior Type</label>
+          <label className="label">行为类型</label>
           <select 
             value={behaviorType} 
             onChange={(e) => setBehaviorType(e.target.value)}
             className="input"
           >
-            <option value="waste_sorting">🗑️ 垃圾分类 / Waste Sorting</option>
-            <option value="tree_planting">🌳 植树造林 / Tree Planting</option>
-            <option value="low_carbon_travel">🚴 低碳出行 / Low-Carbon Travel</option>
+            <option value="waste_sorting">🗑️ 垃圾分类</option>
+            <option value="tree_planting">🌳 植树造林</option>
+            <option value="low_carbon_travel">🚴 低碳出行</option>
           </select>
         </div>
 
         <div className="form-group">
-          <label className="label">行为地点（可选）/ Location (Optional)</label>
+          <label className="label">行为地点（可选）</label>
           <input
             type="text"
             value={location}
             onChange={(e) => setLocation(e.target.value)}
-            placeholder="例如：上海张江软件园 / e.g., Shanghai Zhangjiang Software Park"
+            placeholder="例如：上海张江软件园"
             className="input"
           />
         </div>
 
         <div className="form-group">
-          <label className="label">上传证明（图片/视频）/ Upload Proof (Images/Videos)</label>
+          <label className="label">上传证明（图片/视频，1-5 个）</label>
           <input 
             type="file" 
             multiple 
@@ -152,7 +179,21 @@ export const GreenSubmit = () => {
             className="input"
           />
           {mediaFiles.length > 0 && (
-            <p className="file-info">已选择 {mediaFiles.length} 个文件</p>
+            <div className="file-info">
+              <p>已选择 {mediaFiles.length} 个文件</p>
+              <div className="media-preview">
+                {mediaFiles.map((f, idx) => (
+                  <div key={idx} className="media-item">
+                    <div className="media-name">{f.name}</div>
+                    {f.type.startsWith('image/') ? (
+                      <img className="media-thumb" alt={f.name} src={URL.createObjectURL(f)} />
+                    ) : (
+                      <div className="media-thumb media-video">视频</div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
         </div>
 
@@ -161,7 +202,7 @@ export const GreenSubmit = () => {
           disabled={loading || !publicKey || mediaFiles.length === 0}
           className="btn btn-primary"
         >
-          {loading ? '提交中... / Submitting...' : '提交申报 / Submit'}
+          {loading ? '提交中...' : `提交 ${behaviorText}`}
         </button>
 
         {msg && (
@@ -173,8 +214,27 @@ export const GreenSubmit = () => {
         {result && (
           <div className="result">
             <h3>提交结果</h3>
-            <p><strong>行为ID:</strong> {result.id}</p>
-            <p><strong>状态:</strong> {result.status}</p>
+            <p>
+              <strong>行为ID:</strong> {result.id}{' '}
+              <button
+                type="button"
+                className="btn btn-secondary"
+                style={{ padding: '4px 8px', marginLeft: 8 }}
+                onClick={() => navigator.clipboard?.writeText?.(result.id)}
+              >
+                复制
+              </button>
+            </p>
+            <p><strong>状态:</strong> {statusText(result.status)}</p>
+            {typeof result.fraud_score === 'number' && (
+              <p><strong>AI 检测分数:</strong> {result.fraud_score.toFixed(2)}</p>
+            )}
+            {result.reward_amount ? (
+              <p><strong>奖励:</strong> <span style={{ color: '#4CAF50', fontWeight: 700 }}>{result.reward_amount}</span> SOLGREEN</p>
+            ) : null}
+            {result.status === 'pending_review' ? (
+              <p><strong>提示:</strong> 已提交人工审核，预计 24 小时内完成</p>
+            ) : null}
             {result.tx_hash && (
               <p>
                 <strong>交易哈希:</strong>{' '}

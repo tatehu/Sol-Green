@@ -15,20 +15,31 @@ import (
 // CreateMarketingActivity 创建营销活动（仅管理员）
 func CreateMarketingActivity(c *gin.Context) {
 	var req struct {
-		Title           string    `json:"title" binding:"required"`
-		Description     string    `json:"description" binding:"required"`
-		ActivityType    string    `json:"activity_type" binding:"required"`
-		StartTime       time.Time `json:"start_time" binding:"required"`
-		EndTime         time.Time `json:"end_time" binding:"required"`
-		RewardAmount    uint64    `json:"reward_amount" binding:"required,min=1"`
-		MaxParticipants int       `json:"max_participants"`
-		Rules           string    `json:"rules"`
-		ImageURL        string    `json:"image_url"`
-		Config          string    `json:"config"`
+		Title           string `json:"title" binding:"required"`
+		Description     string `json:"description" binding:"required"`
+		ActivityType    string `json:"activity_type" binding:"required"`
+		StartTime       string `json:"start_time" binding:"required"`
+		EndTime         string `json:"end_time" binding:"required"`
+		RewardAmount    uint64 `json:"reward_amount" binding:"required,min=1"`
+		MaxParticipants int    `json:"max_participants"`
+		Rules           string `json:"rules"`
+		ImageURL        string `json:"image_url"`
+		Config          string `json:"config"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误", "detail": err.Error()})
+		return
+	}
+
+	startTime, err := parseFlexibleTime(req.StartTime)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误", "detail": "start_time: " + err.Error()})
+		return
+	}
+	endTime, err := parseFlexibleTime(req.EndTime)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误", "detail": "end_time: " + err.Error()})
 		return
 	}
 
@@ -38,29 +49,29 @@ func CreateMarketingActivity(c *gin.Context) {
 		return
 	}
 
-	// TODO: 检查管理员权限
-	// if !isAdmin(walletAddr) {
-	//     c.JSON(http.StatusForbidden, gin.H{"error": "无权限"})
-	//     return
-	// }
+	// 按文档：创建营销活动仅管理员
+	if !config.IsAdminWallet(walletAddr) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "无权限"})
+		return
+	}
 
 	activity := &model.MarketingActivity{
-		ID:                uuid.New().String(),
-		Title:             req.Title,
-		Description:       req.Description,
-		ActivityType:      req.ActivityType,
-		Status:            model.MarketingStatusScheduled,
-		StartTime:         req.StartTime,
-		EndTime:           req.EndTime,
-		RewardAmount:      req.RewardAmount,
-		MaxParticipants:   req.MaxParticipants,
+		ID:                  uuid.New().String(),
+		Title:               req.Title,
+		Description:         req.Description,
+		ActivityType:        req.ActivityType,
+		Status:              model.MarketingStatusScheduled,
+		StartTime:           startTime,
+		EndTime:             endTime,
+		RewardAmount:        req.RewardAmount,
+		MaxParticipants:     req.MaxParticipants,
 		CurrentParticipants: 0,
-		Rules:             req.Rules,
-		ImageURL:          req.ImageURL,
-		Config:            req.Config,
-		CreatedBy:         walletAddr,
-		CreatedAt:         time.Now(),
-		UpdatedAt:         time.Now(),
+		Rules:               req.Rules,
+		ImageURL:            req.ImageURL,
+		Config:              req.Config,
+		CreatedBy:           walletAddr,
+		CreatedAt:           time.Now(),
+		UpdatedAt:           time.Now(),
 	}
 
 	if err := config.DB.Create(activity).Error; err != nil {
@@ -91,10 +102,12 @@ func GetMarketingActivities(c *gin.Context) {
 		query = query.Where("activity_type = ?", activityType)
 	}
 
-	// 只显示进行中或即将开始的活动
-	now := time.Now()
-	query = query.Where("(status = ? OR status = ?) AND end_time >= ?", 
-		model.MarketingStatusActive, model.MarketingStatusScheduled, now)
+	// 默认只显示进行中或即将开始的活动；如果显式传了 status，则尊重调用方
+	if status == "" {
+		now := time.Now()
+		query = query.Where("(status = ? OR status = ?) AND end_time >= ?",
+			model.MarketingStatusActive, model.MarketingStatusScheduled, now)
+	}
 
 	var total int64
 	query.Count(&total)
@@ -103,9 +116,9 @@ func GetMarketingActivities(c *gin.Context) {
 	query.Offset(offset).Limit(parseInt(pageSize)).Order("start_time ASC").Find(&activities)
 
 	c.JSON(http.StatusOK, gin.H{
-		"data": activities,
-		"total": total,
-		"page": parseInt(page),
+		"data":      activities,
+		"total":     total,
+		"page":      parseInt(page),
 		"page_size": parseInt(pageSize),
 	})
 }
@@ -126,14 +139,22 @@ func JoinMarketingActivity(c *gin.Context) {
 		return
 	}
 
-	if activity.Status != model.MarketingStatusActive {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "活动未开始或已结束"})
-		return
-	}
-
 	now := time.Now()
 	if now.Before(activity.StartTime) || now.After(activity.EndTime) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "不在活动时间范围内"})
+		return
+	}
+
+	// 允许在时间范围内参与：scheduled 会在首次有人参与时自动转为 active
+	switch activity.Status {
+	case model.MarketingStatusActive:
+		// ok
+	case model.MarketingStatusScheduled:
+		// 在有效期内自动激活
+		config.DB.Model(&activity).Update("status", model.MarketingStatusActive)
+		activity.Status = model.MarketingStatusActive
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{"error": "活动未开始或已结束"})
 		return
 	}
 
@@ -188,10 +209,10 @@ func JoinMarketingActivity(c *gin.Context) {
 // handleSignIn 处理签到活动
 func handleSignIn(activityID, walletAddr string) (*model.MarketingParticipant, error) {
 	today := time.Now().Format("2006-01-02")
-	
+
 	// 检查今日是否已签到
 	var todayRecord model.SignInRecord
-	if err := config.DB.Where("activity_id = ? AND wallet_addr = ? AND sign_in_date = ?", 
+	if err := config.DB.Where("activity_id = ? AND wallet_addr = ? AND sign_in_date = ?",
 		activityID, walletAddr, today).First(&todayRecord).Error; err == nil {
 		return nil, fmt.Errorf("今日已签到")
 	}
@@ -200,8 +221,8 @@ func handleSignIn(activityID, walletAddr string) (*model.MarketingParticipant, e
 	var lastRecord model.SignInRecord
 	yesterday := time.Now().AddDate(0, 0, -1).Format("2006-01-02")
 	consecutiveDays := 1
-	
-	if err := config.DB.Where("activity_id = ? AND wallet_addr = ? AND sign_in_date = ?", 
+
+	if err := config.DB.Where("activity_id = ? AND wallet_addr = ? AND sign_in_date = ?",
 		activityID, walletAddr, yesterday).First(&lastRecord).Error; err == nil {
 		consecutiveDays = lastRecord.ConsecutiveDays + 1
 	}
@@ -243,7 +264,7 @@ func handleInvite(activityID, walletAddr string, c *gin.Context) (*model.Marketi
 
 	// 检查是否已邀请过此人
 	var existing model.InviteRecord
-	if err := config.DB.Where("inviter_addr = ? AND invitee_addr = ? AND activity_id = ?", 
+	if err := config.DB.Where("inviter_addr = ? AND invitee_addr = ? AND activity_id = ?",
 		walletAddr, req.InviteeAddr, activityID).First(&existing).Error; err == nil {
 		return nil, fmt.Errorf("已邀请过此用户")
 	}
