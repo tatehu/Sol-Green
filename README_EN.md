@@ -2,6 +2,19 @@
 
 A Solana blockchain-based environmental behavior recording and reward system that incentivizes users to participate in environmental activities through Web3 technology.
 
+## 🎥 Demo Videos
+
+- [Watch Sol-Green Demo Part 1](./assets/Sol%20Green%20Part%201.mov)
+- [Watch Sol-Green Demo Part 2](./assets/Sol%20Green%20Part%202.mov)
+
+<video src="./assets/Sol%20Green%20Part%201.mov" controls width="640">
+  Your browser does not support the video tag. Please click the link above to watch Part 1.
+</video>
+
+<video src="./assets/Sol%20Green%20Part%202.mov" controls width="640">
+  Your browser does not support the video tag. Please click the link above to watch Part 2.
+</video>
+
 ## 📋 Project Overview
 
 Sol-Green is a decentralized environmental reward platform where users can earn token rewards by submitting environmental behaviors (waste sorting, tree planting, low-carbon travel, etc.). The project uses AI fraud detection, on-chain proof storage, and third-party organization verification to ensure behavior authenticity and credibility.

@@ -2,6 +2,19 @@
 
 本文档展示了 Sol-Green 环保奖励平台的各项功能操作界面和流程。
 
+## 🎥 项目演示视频
+
+- [点击观看 Sol-Green 演示 Part 1](../assets/Sol%20Green%20Part%201.mov)
+- [点击观看 Sol-Green 演示 Part 2](../assets/Sol%20Green%20Part%202.mov)
+
+<video src="../assets/Sol%20Green%20Part%201.mov" controls width="640">
+  您的浏览器不支持 video 标签，请直接点击上方链接观看 Part 1 视频。
+</video>
+
+<video src="../assets/Sol%20Green%20Part%202.mov" controls width="640">
+  您的浏览器不支持 video 标签，请直接点击上方链接观看 Part 2 视频。
+</video>
+
 ## 📸 功能展示图片
 
 ### 1. 首页界面 (01_homepage.png)

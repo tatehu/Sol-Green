@@ -54,15 +54,17 @@ export const WalletContextProvider = ({ children }) => {
 // 只渲染按钮，本身不再创建 Provider
 export const WalletConnect = () => {
   const { publicKey, connected, signMessage } = useWallet();
-  const [authMsg, setAuthMsg] = useState('');
+  const [, setAuthMsg] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
   const lastAuthedWalletRef = useRef('');
+  const lastAutoLoginAttemptRef = useRef('');
 
   useEffect(() => {
     if (!connected) {
       setAuthMsg('');
       setAuthLoading(false);
       lastAuthedWalletRef.current = '';
+      lastAutoLoginAttemptRef.current = '';
     }
   }, [connected]);
 
@@ -70,6 +72,15 @@ export const WalletConnect = () => {
   const token = localStorage.getItem('token');
   const tokenWallet = localStorage.getItem('token_wallet_addr');
   const isAuthed = Boolean(token && tokenWallet === walletAddr);
+
+  // 如果本地 token 属于其他钱包，避免“连接新钱包但仍拿旧 token”造成接口 401/数据错乱
+  useEffect(() => {
+    if (!walletAddr) return;
+    if (token && tokenWallet && tokenWallet !== walletAddr) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('token_wallet_addr');
+    }
+  }, [token, tokenWallet, walletAddr]);
 
   const handleLogin = async () => {
     if (!connected || !publicKey) {
@@ -112,29 +123,33 @@ export const WalletConnect = () => {
     }
   };
 
+  // 自动登录：连接钱包后自动获取 token（避免再点“登录”按钮）
+  useEffect(() => {
+    if (!connected) return;
+    if (!walletAddr) return;
+    if (isAuthed) return;
+    if (authLoading) return;
+
+    // 每个钱包地址每次页面加载只自动触发一次，避免刷新/状态抖动导致反复弹签名
+    if (lastAutoLoginAttemptRef.current === walletAddr) return;
+    const key = `solgreen_autologin_attempted:${walletAddr}`;
+    if (sessionStorage.getItem(key) === '1') {
+      lastAutoLoginAttemptRef.current = walletAddr;
+      return;
+    }
+
+    sessionStorage.setItem(key, '1');
+    lastAutoLoginAttemptRef.current = walletAddr;
+    // 不要阻塞渲染；并给 WalletMultiButton 一点时间完成连接状态更新
+    setTimeout(() => {
+      handleLogin();
+    }, 300);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connected, walletAddr, isAuthed, authLoading]);
+
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
       <WalletMultiButton />
-      {connected && !isAuthed ? (
-        <button
-          onClick={handleLogin}
-          disabled={authLoading}
-          style={{
-            padding: '8px 10px',
-            borderRadius: 8,
-            border: '1px solid rgba(255,255,255,0.2)',
-            background: 'rgba(255,255,255,0.08)',
-            color: 'inherit',
-            cursor: authLoading ? 'not-allowed' : 'pointer',
-            fontSize: 12,
-          }}
-        >
-          {authLoading ? '登录中...' : '登录'}
-        </button>
-      ) : null}
-
-      {connected && isAuthed ? <span style={{ fontSize: 12, opacity: 0.8 }}>已登录</span> : null}
-      {authMsg ? <span style={{ fontSize: 12, opacity: 0.8 }}>{authMsg}</span> : null}
     </div>
   );
 };
